@@ -39,31 +39,30 @@ func calculate(req CalculationRequest) (Result, error) {
 	}
 }
 
-func createResponse(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+func createResponse(status int, body string) (events.APIGatewayProxyResponse, error) {
+	return events.APIGatewayProxyResponse{
+		StatusCode: status,
+		Body:       body,
+	}, nil
+}
+
+func handlePostRequest(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	var calculationRequest CalculationRequest
 	err := json.Unmarshal([]byte(request.Body), &calculationRequest)
 	if err != nil {
-		return events.APIGatewayProxyResponse{
-			StatusCode: 400,
-			Body:       "Could not unmarshal Json, please provide a valid request",
-		}, nil
+		return createResponse(400, "Could not unmarshal Json, please provide a valid request")
 	}
 
 	result, resultErr := calculate(calculationRequest)
 	if resultErr != nil {
-		return events.APIGatewayProxyResponse{
-			StatusCode: 500,
-			Body:       calculationMethodNotSupportedMessage,
-		}, nil
+		return createResponse(500, calculationMethodNotSupportedMessage)
 	}
 
 	response, respErr := json.Marshal(result)
 	if respErr != nil {
-		return events.APIGatewayProxyResponse{
-			StatusCode: 500,
-			Body:       "Could not marshal Json",
-		}, nil
+		return createResponse(500, "Could not marshal Json")
 	}
+
 	return events.APIGatewayProxyResponse{
 		StatusCode: 200,
 		Headers: map[string]string{
@@ -75,7 +74,7 @@ func createResponse(request events.APIGatewayProxyRequest) (events.APIGatewayPro
 
 func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	if request.HTTPMethod == "POST" {
-		return createResponse(request)
+		return handlePostRequest(request)
 	} else {
 		return events.APIGatewayProxyResponse{}, HTTPMethodNotSupported
 	}
