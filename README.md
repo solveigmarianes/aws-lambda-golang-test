@@ -1,6 +1,6 @@
-# AWS Lambda GoLoang Test
+# AWS Lambda GoLang Test
 
-Request format
+POST Request format
 
 ```js
 {
