@@ -2,17 +2,16 @@ package main
 
 import (
 	"context"
-	"errors"
-	"fmt"
-
 	"encoding/json"
+	"errors"
+
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 )
 
 var (
-	// ErrNameNotProvided is thrown when a name is not provided
-	HTTPMethodNotSupported = errors.New("no name was provided in the HTTP body")
+	HTTPMethodNotSupported               = errors.New("no name was provided in the HTTP body")
+	calculationMethodNotSupportedMessage = "Invalid method. Valid methods are \"ADD\", \"SUBTRACT\", \"MULTIPLY\" and \"DIVIDE\""
 )
 
 type CalculationRequest struct {
@@ -25,18 +24,18 @@ type Result struct {
 	Result int `json:"result"`
 }
 
-func calculate(req CalculationRequest) Result {
+func calculate(req CalculationRequest) (Result, error) {
 	switch req.Method {
 	case "ADD":
-		return Result{req.A + req.B}
+		return Result{req.A + req.B}, nil
 	case "SUBTRACT":
-		return Result{req.A - req.B}
+		return Result{req.A - req.B}, nil
 	case "MULTIPLY":
-		return Result{req.A * req.B}
+		return Result{req.A * req.B}, nil
 	case "DIVIDE":
-		return Result{req.A / req.B}
+		return Result{req.A / req.B}, nil
 	default:
-		return Result{0}
+		return Result{0}, errors.New(calculationMethodNotSupportedMessage)
 	}
 }
 
@@ -46,11 +45,19 @@ func createResponse(request events.APIGatewayProxyRequest) (events.APIGatewayPro
 	if err != nil {
 		return events.APIGatewayProxyResponse{
 			StatusCode: 400,
-			Body:       "Could not unmarshal Json",
+			Body:       "Could not unmarshal Json, please provide a valid request",
 		}, nil
 	}
 
-	response, respErr := json.Marshal(calculate(calculationRequest))
+	result, resultErr := calculate(calculationRequest)
+	if resultErr != nil {
+		return events.APIGatewayProxyResponse{
+			StatusCode: 500,
+			Body:       calculationMethodNotSupportedMessage,
+		}, nil
+	}
+
+	response, respErr := json.Marshal(result)
 	if respErr != nil {
 		return events.APIGatewayProxyResponse{
 			StatusCode: 500,
@@ -67,20 +74,9 @@ func createResponse(request events.APIGatewayProxyRequest) (events.APIGatewayPro
 }
 
 func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	fmt.Printf("Body size = %d. \n", len(request.Body))
-	fmt.Println(request.Body)
-	fmt.Println("Headers:")
-	for key, value := range request.Headers {
-		fmt.Printf("  %s: %s\n", key, value)
-	}
-	if request.HTTPMethod == "GET" {
-		fmt.Printf("GET METHOD\n")
-		return events.APIGatewayProxyResponse{Body: "GET", StatusCode: 200}, nil
-	} else if request.HTTPMethod == "POST" {
-		fmt.Printf("POST METHOD\n")
+	if request.HTTPMethod == "POST" {
 		return createResponse(request)
 	} else {
-		fmt.Printf("NEITHER\n")
 		return events.APIGatewayProxyResponse{}, HTTPMethodNotSupported
 	}
 }
